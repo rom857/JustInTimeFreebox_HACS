@@ -1,0 +1,12 @@
+{
+  "domain": "just_in_time_freebox",
+  "name": "Just-In-Time Freebox",
+  "version": "0.1.0",
+  "documentation": "https://github.com/your-org/JustInTimeFreebox_HACS",
+  "issue_tracker": "https://github.com/your-org/JustInTimeFreebox_HACS/issues",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "requirements": [],
+  "iot_class": "cloud_polling"
+}
