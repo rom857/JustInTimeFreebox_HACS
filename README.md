@@ -33,7 +33,7 @@ The integration **never creates or deletes Freebox rules** — it only toggles e
 The setup form asks for:
 
 - **Grants API URL** — full URL of your grants endpoint.
-- **Grants API key** — sent as `X-API-Key: <key>`.
+- **Grants API key** — sent as `X-Access-Key: <key>`.
 - **Freebox host** — e.g. `mafreebox.freebox.fr` or `192.168.1.254`.
 - **Use HTTPS to reach Freebox** — see the HTTPS note below.
 - **Poll interval (seconds)** — minimum 5, default 30.

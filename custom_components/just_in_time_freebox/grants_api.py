@@ -26,7 +26,7 @@ async def fetch_grant(
         started_utc (datetime|None), expires_utc (datetime|None),
         remaining_seconds (int|None).
     """
-    headers = {"X-API-Key": api_key, "Accept": "application/json"}
+    headers = {"X-Access-Key": api_key, "Accept": "application/json"}
     try:
         async with session.get(url, headers=headers) as resp:
             if resp.status >= 400:
