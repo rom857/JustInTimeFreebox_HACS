@@ -1,6 +1,7 @@
 """Async client for the external grants API."""
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 
@@ -29,12 +30,20 @@ async def fetch_grant(
     headers = {"X-Access-Key": api_key, "Accept": "application/json"}
     try:
         async with session.get(url, headers=headers) as resp:
+            text = await resp.text()
             if resp.status >= 400:
-                text = await resp.text()
                 raise GrantsApiError(
                     f"grants API HTTP {resp.status}: {text[:200]}"
                 )
-            data = await resp.json(content_type=None)
+            content_type = resp.headers.get("Content-Type", "")
+            try:
+                data = json.loads(text)
+            except ValueError as err:
+                raise GrantsApiError(
+                    f"grants API returned non-JSON body "
+                    f"(Content-Type={content_type!r}, status={resp.status}): "
+                    f"{text[:200]!r}"
+                ) from err
     except aiohttp.ClientError as err:
         raise GrantsApiError(f"grants API request failed: {err}") from err
 
