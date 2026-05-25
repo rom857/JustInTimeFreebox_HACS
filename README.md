@@ -17,7 +17,7 @@ Each poll, the integration calls your grants API. The expected JSON response is:
 }
 ```
 
-When `granted` is `true`, the integration looks for an existing Freebox port-forwarding rule (`/api/vN/fw/redir/`) whose `src_port` and `ip_proto` match `port` and `protocol`. If found, the rule's `enabled` flag is set to `true`. When `expiresUtc` is reached or `granted` flips to `false`, the rule is set back to `enabled: false`.
+When `granted` is `true`, the integration looks for an existing Freebox port-forwarding rule (`/api/vN/fw/redir/`) whose `lan_port` and `ip_proto` match `port` and `protocol`. If found, the rule's `enabled` flag is set to `true`. When `expiresUtc` is reached or `granted` flips to `false`, the rule is set back to `enabled: false`.
 
 The integration **never creates or deletes Freebox rules** — it only toggles existing ones. If no matching rule exists, a single warning is logged and the grant is ignored.
 

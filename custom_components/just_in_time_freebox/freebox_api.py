@@ -308,12 +308,18 @@ class FreeboxClient:
 
     @staticmethod
     def find_rule(
-        redirs: list[dict[str, Any]], src_port: int, ip_proto: str
+        redirs: list[dict[str, Any]], lan_port: int, ip_proto: str
     ) -> dict[str, Any] | None:
+        """Find the redir rule whose LAN-side port + protocol match.
+
+        Freebox redir objects expose ``lan_port`` (destination on the LAN)
+        and ``ip_proto``; the WAN-side port is ``wan_port`` /
+        ``wan_port_start`` and is not used for matching here.
+        """
         proto = ip_proto.lower()
         for rule in redirs:
             if (
-                int(rule.get("src_port", -1)) == int(src_port)
+                int(rule.get("lan_port", -1)) == int(lan_port)
                 and str(rule.get("ip_proto", "")).lower() == proto
             ):
                 return rule
