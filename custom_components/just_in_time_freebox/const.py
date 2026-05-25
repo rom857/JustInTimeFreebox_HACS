@@ -19,12 +19,12 @@ CONF_FREEBOX_API_VERSION = "freebox_api_version"
 # Defaults
 DEFAULT_POLL_INTERVAL = 30
 MIN_POLL_INTERVAL = 5
-DEFAULT_USE_HTTPS = False
+DEFAULT_USE_HTTPS = True
 
 # Freebox app identity
 APP_ID = "just_in_time_freebox"
 APP_NAME = "JIT Freebox"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.6.0"
 DEVICE_NAME = "Home Assistant"
 
 # Backoff (Freebox failures)
