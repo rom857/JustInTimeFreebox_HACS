@@ -89,14 +89,16 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.warning("Grants API validation failed: %s", err)
                 errors["base"] = "grants_api_error"
 
-            # Discover Freebox HTTPS endpoint via plain HTTP.
-            api_domain: str | None = None
+            # Discover Freebox HTTPS port + API version via plain HTTP.
+            # The user-entered host is enforced verbatim; ``api_domain`` from
+            # the discovery payload is intentionally ignored so the user can
+            # target a LAN IP or custom DNS name without being redirected to
+            # the Freebox-assigned ``*.fbxos.fr`` hostname.
             https_port: int | None = None
             api_version: str | None = None
             if not errors:
                 try:
                     info = await discover_api(session, user_input[CONF_FREEBOX_HOST])
-                    api_domain = info.get("api_domain") or user_input[CONF_FREEBOX_HOST]
                     https_port = int(info["https_port"])
                     major = str(info.get("api_version", "8.0")).split(".", 1)[0]
                     api_version = f"v{major}"
@@ -107,7 +109,6 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 self._user_input = {
                     **user_input,
-                    CONF_FREEBOX_HOST: api_domain,
                     CONF_FREEBOX_PORT: https_port,
                     CONF_FREEBOX_API_VERSION: api_version,
                 }
