@@ -17,9 +17,11 @@ Each poll, the integration calls your grants API. The expected JSON response is:
 }
 ```
 
-When `granted` is `true`, the integration looks for an existing Freebox port-forwarding rule (`/api/vN/fw/redir/`) whose `lan_port` and `ip_proto` match `port` and `protocol`. If found, the rule's `enabled` flag is set to `true`. When `expiresUtc` is reached or `granted` flips to `false`, the rule is set back to `enabled: false`.
+When `granted` is `true` and not expired, the integration looks for an existing Freebox port-forwarding rule (`fw/redir/`) whose `lan_port` and `ip_proto` match `port` and `protocol`. If found, the rule's `enabled` flag is set to `true`. When `expiresUtc` is reached or `granted` flips to `false`, the rule is set back to `enabled: false`.
 
-The integration **never creates or deletes Freebox rules** — it only toggles existing ones. If no matching rule exists, a single warning is logged and the grant is ignored.
+On **every poll** the integration reconciles the rule's state, so any out-of-band toggle (manual edit, restart, etc.) is corrected on the next tick.
+
+The integration **never creates or deletes Freebox rules** — it only toggles existing ones. If no matching rule exists, the `last_action` sensor reports `rule_not_found` and the grant is otherwise ignored.
 
 ## Installation (HACS)
 
@@ -28,23 +30,22 @@ The integration **never creates or deletes Freebox rules** — it only toggles e
 3. Restart Home Assistant.
 4. Settings → Devices & services → Add integration → *Just-In-Time Freebox*.
 
+> **Upgrading from 0.1.x:** version 0.2.0 switches to the official `freebox-api` library. Remove the existing integration entry and re-add it after upgrading (a fresh pairing is required).
+
 ## Configuration
 
 The setup form asks for:
 
 - **Grants API URL** — full URL of your grants endpoint.
 - **Grants API key** — sent as `X-Access-Key: <key>`.
-- **Freebox host** — e.g. `mafreebox.freebox.fr` or `192.168.1.254`.
-- **Use HTTPS to reach Freebox** — see the HTTPS note below.
+- **Freebox host** — e.g. `mafreebox.freebox.fr` (default) or your LAN IP.
 - **Poll interval (seconds)** — minimum 5, default 30.
 
-After submitting, you will be prompted to **press the right arrow (▶) on the Freebox front panel within 60 seconds** to authorize Home Assistant. The resulting `app_token` is stored in the config entry.
+After submitting, you will be prompted to **press the right arrow (▶) on the Freebox front panel** to authorize Home Assistant. The resulting `app_token` is stored under `<config>/just_in_time_freebox/<host>.conf` (managed by the `freebox-api` library).
 
-All settings (including grants URL/key, poll interval, Freebox host and HTTPS) can be edited later via *Configure* on the integration card. Changing the host typically requires re-pairing — remove and re-add the integration in that case.
+TLS to the Freebox is handled by the library, which bundles the Freebox CA — no HTTPS toggle is needed.
 
-### HTTPS note
-
-This integration uses **standard SSL certificate verification**. The default `mafreebox.freebox.fr` endpoint uses a self-signed certificate that will **not** validate, so leave HTTPS **off** when targeting it locally. Use HTTPS only if your Freebox is exposed under a name backed by a publicly trusted certificate (e.g. via Freebox remote access).
+Grants URL, grants key and poll interval can be edited later via *Configure* on the integration card. Changing the Freebox host requires removing and re-adding the integration.
 
 ## Entities
 
@@ -60,10 +61,11 @@ A single device is created with:
 
 ## Resilience
 
-If the Freebox is unreachable, the integration applies **exponential backoff** to its Freebox calls (base = poll interval, capped at 15 minutes), resetting on the next successful call. Grants API failures simply mark entities unavailable until the next successful poll.
+If the Freebox is unreachable, the integration applies **exponential backoff** to its Freebox calls (base = poll interval, capped at 15 minutes), resetting on the next successful call. Grants API failures mark entities unavailable until the next successful poll.
 
 ## Troubleshooting
 
-- **`No Freebox port-forward rule matches port=… proto=…`** — create the matching redirection on the Freebox first (Freebox OS → Paramètres de la Freebox → Gestion des ports). The integration will only flip its `enabled` flag.
-- **Pairing fails** — confirm the Freebox host is reachable and that you pressed the front-panel button within 60 s.
-- **HTTPS fails** — see the HTTPS note above.
+- **`rule_not_found`** — create the matching redirection on the Freebox first (Freebox OS → Paramètres de la Freebox → Gestion des ports), matching the grant's `port` (as `lan_port`) and `protocol`. The integration will only flip its `enabled` flag.
+- **Pairing fails** — confirm the Freebox host is reachable and that you pressed the front-panel button.
+- **`freebox_connection_error`** — verify `http://<host>/api_version` is reachable from Home Assistant; the integration uses it to discover the API endpoint.
+- Enable debug logs via `logger:` → `custom_components.just_in_time_freebox: debug` (and `freebox_api: debug`) to inspect requests.

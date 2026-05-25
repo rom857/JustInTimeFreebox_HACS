@@ -4,10 +4,13 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 
-from .const import CONF_POLL_INTERVAL, DOMAIN, PLATFORMS
+from .const import DOMAIN, PLATFORMS
 from .coordinator import JitFreeboxCoordinator
+from .freebox_api import AuthorizationError, HttpRequestError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,26 +18,36 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up from a config entry."""
     coordinator = JitFreeboxCoordinator(hass, entry)
+
+    try:
+        await coordinator.async_open()
+    except AuthorizationError as err:
+        _LOGGER.warning("Freebox authorization rejected: %s", err)
+        raise ConfigEntryNotReady(f"Freebox authorization rejected: {err}") from err
+    except HttpRequestError as err:
+        _LOGGER.warning("Freebox not reachable: %s", err)
+        raise ConfigEntryNotReady(f"Freebox not reachable: {err}") from err
+
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    async def _on_stop(_event: Event) -> None:
+        await coordinator.async_close()
+
+    entry.async_on_unload(
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _on_stop)
+    )
+    entry.async_on_unload(coordinator.async_close)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """React to options updates."""
-    coordinator: JitFreeboxCoordinator = hass.data[DOMAIN][entry.entry_id]
-    new_poll = entry.options.get(
-        CONF_POLL_INTERVAL, entry.data.get(CONF_POLL_INTERVAL)
-    )
-    if new_poll is not None:
-        coordinator.update_poll_interval(int(new_poll))
-    # Trigger an immediate refresh so URL/key changes apply now.
-    await coordinator.async_request_refresh()
+    """Reload on options change (poll interval / grants URL / key)."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

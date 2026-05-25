@@ -3,28 +3,25 @@
     "step": {
       "user": {
         "title": "Just-In-Time Freebox",
-        "description": "Configure the grants API and your local Freebox server. After submitting, you will be asked to press the right arrow on the Freebox front panel to authorize this integration.",
+        "description": "Configure the grants API and your local Freebox host. After submitting, you will be asked to press the right arrow on the Freebox front panel to authorize this integration.",
         "data": {
           "grants_url": "Grants API URL",
           "grants_api_key": "Grants API key",
           "freebox_host": "Freebox host",
-          "freebox_use_https": "Use HTTPS to reach Freebox",
           "poll_interval": "Poll interval (seconds)"
         }
       },
       "pairing": {
         "title": "Authorize on Freebox",
-        "description": "Press the right arrow (\u25b6) on the Freebox front panel within 60 seconds to authorize Home Assistant."
+        "description": "Press the right arrow (\u25b6) on the Freebox front panel to authorize Home Assistant, then submit. This step will wait for confirmation from the Freebox."
       }
     },
     "error": {
       "grants_api_error": "Could not reach the grants API with the provided URL/key.",
-      "freebox_discovery_error": "Could not discover the Freebox API at this host. Check host and HTTPS setting.",
-      "freebox_auth_error": "Could not start authorization on the Freebox.",
-      "pairing_pending": "Pairing did not complete in time. Try again and press the front-panel button.",
+      "freebox_discovery_error": "Could not discover the Freebox API at this host.",
+      "freebox_connection_error": "Could not connect to the Freebox.",
       "pairing_denied": "Pairing was denied on the Freebox.",
-      "pairing_timeout": "Pairing timed out on the Freebox.",
-      "pairing_unknown": "Pairing returned an unknown status."
+      "unknown": "An unknown error occurred."
     },
     "abort": {
       "already_configured": "This Freebox is already configured."
@@ -37,8 +34,6 @@
         "data": {
           "grants_url": "Grants API URL",
           "grants_api_key": "Grants API key",
-          "freebox_host": "Freebox host",
-          "freebox_use_https": "Use HTTPS to reach Freebox",
           "poll_interval": "Poll interval (seconds)"
         }
       }
