@@ -8,6 +8,7 @@
           "grants_url": "Grants API URL",
           "grants_api_key": "Grants API key",
           "freebox_host": "Freebox host",
+          "freebox_port": "Freebox HTTPS port (default 443, overrides auto-discovery)",
           "poll_interval": "Poll interval (seconds)"
         }
       },

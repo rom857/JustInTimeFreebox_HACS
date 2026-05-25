@@ -48,19 +48,26 @@ def token_path(hass: HomeAssistant, host: str) -> str:
 
 def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     d = defaults or {}
-    return vol.Schema(
-        {
-            vol.Required(CONF_GRANTS_URL, default=d.get(CONF_GRANTS_URL, "")): str,
-            vol.Required(CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")): str,
-            vol.Required(
-                CONF_FREEBOX_HOST, default=d.get(CONF_FREEBOX_HOST, DEFAULT_HOST)
-            ): str,
-            vol.Required(
-                CONF_POLL_INTERVAL,
-                default=d.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
-            ): vol.All(int, vol.Range(min=MIN_POLL_INTERVAL)),
-        }
+    schema: dict[Any, Any] = {
+        vol.Required(CONF_GRANTS_URL, default=d.get(CONF_GRANTS_URL, "")): str,
+        vol.Required(CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")): str,
+        vol.Required(
+            CONF_FREEBOX_HOST, default=d.get(CONF_FREEBOX_HOST, DEFAULT_HOST)
+        ): str,
+    }
+    # Optional port override: when set, takes precedence over the value
+    # returned by ``/api_version``. Defaults to 443.
+    port_default = d.get(CONF_FREEBOX_PORT, 443)
+    schema[vol.Optional(CONF_FREEBOX_PORT, default=port_default)] = vol.All(
+        int, vol.Range(min=1, max=65535)
     )
+    schema[
+        vol.Required(
+            CONF_POLL_INTERVAL,
+            default=d.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+        )
+    ] = vol.All(int, vol.Range(min=MIN_POLL_INTERVAL))
+    return vol.Schema(schema)
 
 
 class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -94,12 +101,15 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             # the discovery payload is intentionally ignored so the user can
             # target a LAN IP or custom DNS name without being redirected to
             # the Freebox-assigned ``*.fbxos.fr`` hostname.
-            https_port: int | None = None
+            # A user-supplied port (if any) overrides the discovered one.
+            user_port = user_input.get(CONF_FREEBOX_PORT)
+            https_port: int | None = int(user_port) if user_port else None
             api_version: str | None = None
             if not errors:
                 try:
                     info = await discover_api(session, user_input[CONF_FREEBOX_HOST])
-                    https_port = int(info["https_port"])
+                    if https_port is None:
+                        https_port = int(info["https_port"])
                     major = str(info.get("api_version", "8.0")).split(".", 1)[0]
                     api_version = f"v{major}"
                 except (FreeboxApiError, KeyError, ValueError, TypeError) as err:
