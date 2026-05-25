@@ -99,58 +99,87 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._freebox_failures = 0
         self._freebox_skip_until = None
 
-    async def _enable_rule(self, port: int, protocol: str, expires_utc: datetime | None) -> None:
-        """Find matching rule, enable it if needed, remember active state."""
+    def _clear_active(self) -> None:
+        self._active_rule_id = None
+        self._active_port = None
+        self._active_protocol = None
+        self._active_expires_utc = None
+
+    async def _reconcile_rule(
+        self,
+        port: int,
+        protocol: str,
+        desired_enabled: bool,
+        expires_utc: datetime | None,
+    ) -> None:
+        """Look up the rule matching (port, protocol) and force its
+        ``enabled`` flag to ``desired_enabled``. Runs every poll, so manual
+        changes on Freebox OS are corrected on the next cycle.
+        """
         try:
             redirs = await self._freebox.list_redirs()
             rule = FreeboxClient.find_rule(redirs, port, protocol)
             if rule is None:
                 _LOGGER.warning(
-                    "No Freebox port-forward rule matches port=%s proto=%s; ignoring grant",
+                    "No Freebox port-forward rule matches port=%s proto=%s",
                     port,
                     protocol,
                 )
                 self._last_action = ACTION_RULE_NOT_FOUND
                 self._record_freebox_success()
+                if not desired_enabled:
+                    self._clear_active()
                 return
+
             rule_id = int(rule["id"])
-            if not bool(rule.get("enabled", False)):
-                await self._freebox.set_redir_enabled(rule_id, True)
-                _LOGGER.info(
-                    "Enabled Freebox redir rule id=%s (port=%s proto=%s) until %s",
-                    rule_id,
-                    port,
-                    protocol,
-                    expires_utc.isoformat() if expires_utc else "?",
-                )
-                self._last_action = ACTION_ENABLED
+            currently_enabled = bool(rule.get("enabled", False))
+
+            if currently_enabled != desired_enabled:
+                await self._freebox.set_redir_enabled(rule_id, desired_enabled)
+                if desired_enabled:
+                    _LOGGER.info(
+                        "Enabled Freebox redir rule id=%s (port=%s proto=%s) until %s",
+                        rule_id,
+                        port,
+                        protocol,
+                        expires_utc.isoformat() if expires_utc else "?",
+                    )
+                    self._last_action = ACTION_ENABLED
+                else:
+                    _LOGGER.info(
+                        "Disabled Freebox redir rule id=%s (port=%s proto=%s)",
+                        rule_id,
+                        port,
+                        protocol,
+                    )
+                    self._last_action = ACTION_DISABLED
             else:
                 _LOGGER.debug(
-                    "Freebox redir rule id=%s already enabled; tracking expiry",
+                    "Freebox redir rule id=%s already %s; no change",
                     rule_id,
+                    "enabled" if desired_enabled else "disabled",
                 )
-            self._active_rule_id = rule_id
-            self._active_port = port
-            self._active_protocol = protocol
-            self._active_expires_utc = expires_utc
+
+            if desired_enabled:
+                self._active_rule_id = rule_id
+                self._active_port = port
+                self._active_protocol = protocol
+                self._active_expires_utc = expires_utc
+            else:
+                self._clear_active()
             self._record_freebox_success()
         except FreeboxApiError as err:
             self._record_freebox_failure(err)
 
-    async def _disable_active_rule(self, reason: str) -> None:
-        if self._active_rule_id is None:
-            return
-        rule_id = self._active_rule_id
+    async def _disable_rule_by_id(self, rule_id: int, reason: str) -> None:
+        """Disable a specific rule id (used when the grant target drifts to
+        a different port/protocol and we need to clean up the old rule)."""
         try:
             await self._freebox.set_redir_enabled(rule_id, False)
             _LOGGER.info(
                 "Disabled Freebox redir rule id=%s (%s)", rule_id, reason
             )
             self._last_action = ACTION_DISABLED
-            self._active_rule_id = None
-            self._active_expires_utc = None
-            self._active_port = None
-            self._active_protocol = None
             self._record_freebox_success()
         except FreeboxApiError as err:
             self._record_freebox_failure(err)
@@ -176,36 +205,36 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if not in_backoff:
             now = _utcnow()
-            # Expiry / revocation handling first
-            if self._active_rule_id is not None:
-                expired = (
-                    self._active_expires_utc is not None
-                    and now >= self._active_expires_utc
-                )
-                changed = (
-                    granted
-                    and (
-                        port != self._active_port
-                        or protocol != self._active_protocol
-                    )
-                )
-                if not granted or expired or changed:
-                    reason = (
-                        "grant revoked" if not granted
-                        else "expired" if expired
-                        else "grant target changed"
-                    )
-                    await self._disable_active_rule(reason)
+            expired = expires_utc is not None and now >= expires_utc
+            desired_enabled = bool(granted) and not expired
 
-            # Activation handling
+            # Target drift: previously activated rule differs from current
+            # grant target. Disable the stale rule before touching the new one.
             if (
-                granted
+                self._active_rule_id is not None
+                and self._active_port is not None
+                and self._active_protocol is not None
                 and port is not None
                 and protocol is not None
-                and self._active_rule_id is None
-                and not self._freebox_in_backoff()
+                and (port != self._active_port or protocol != self._active_protocol)
             ):
-                await self._enable_rule(port, protocol, expires_utc)
+                await self._disable_rule_by_id(
+                    self._active_rule_id, "grant target changed"
+                )
+                self._clear_active()
+
+            if port is not None and protocol is not None:
+                # Reconcile every poll: granted=True → rule enabled,
+                # granted=False (or expired) → rule disabled.
+                await self._reconcile_rule(port, protocol, desired_enabled, expires_utc)
+            elif self._active_rule_id is not None and not desired_enabled:
+                # No port/proto in payload, but we previously activated
+                # something — make sure it gets disabled.
+                await self._disable_rule_by_id(
+                    self._active_rule_id,
+                    "grant revoked" if not granted else "expired",
+                )
+                self._clear_active()
         else:
             _LOGGER.debug(
                 "Skipping Freebox actions; in backoff until %s",
