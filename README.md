@@ -2,6 +2,8 @@
 
 A Home Assistant custom integration that polls an external "grants" API and, when a grant is active, **enables a matching port-forwarding rule on your local Freebox**. When the grant expires (or is revoked), the rule is automatically disabled.
 
+The grant decision is provided by the **Just In Time Portal** project: https://github.com/rom857/JustInTime_Portal
+
 ## How it works
 
 Each poll, the integration calls your grants API. The expected JSON response is:
