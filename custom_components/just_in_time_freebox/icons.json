@@ -1,0 +1,44 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "granted": {
+        "default": "mdi:lock",
+        "state": {
+          "on": "mdi:lock-open-variant"
+        }
+      }
+    },
+    "sensor": {
+      "status": {
+        "default": "mdi:shield-question",
+        "state": {
+          "granted": "mdi:shield-check",
+          "not_granted": "mdi:shield-off",
+          "unknown": "mdi:shield-question"
+        }
+      },
+      "port": {
+        "default": "mdi:ethernet"
+      },
+      "protocol": {
+        "default": "mdi:transit-connection-variant"
+      },
+      "expires_at": {
+        "default": "mdi:clock-end"
+      },
+      "remaining_seconds": {
+        "default": "mdi:timer-sand"
+      },
+      "last_action": {
+        "default": "mdi:history",
+        "state": {
+          "idle": "mdi:checkbox-blank-circle-outline",
+          "enabled_rule": "mdi:lock-open-variant",
+          "disabled_rule": "mdi:lock",
+          "rule_not_found": "mdi:lock-question",
+          "freebox_error": "mdi:alert-circle"
+        }
+      }
+    }
+  }
+}

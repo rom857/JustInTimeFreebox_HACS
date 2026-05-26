@@ -36,7 +36,6 @@ The integration **never creates or deletes Freebox rules** — it only toggles e
 3. Restart Home Assistant.
 4. Settings → Devices & services → Add integration → *Just-In-Time Freebox*.
 
-> **Upgrading from 0.1.x:** version 0.2.0 switches to the official `freebox-api` library. Remove the existing integration entry and re-add it after upgrading (a fresh pairing is required).
 
 ## Configuration
 
