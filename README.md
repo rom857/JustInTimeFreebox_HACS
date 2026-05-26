@@ -23,6 +23,12 @@ On **every poll** the integration reconciles the rule's state, so any out-of-ban
 
 The integration **never creates or deletes Freebox rules** — it only toggles existing ones. If no matching rule exists, the `last_action` sensor reports `rule_not_found` and the grant is otherwise ignored.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)"  srcset="docs/jit-freebox-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/jit-freebox-light.svg">
+  <img alt="JIT Freebox flow" src="docs/jit-freebox-light.svg">
+</picture>
+
 ## Installation (HACS)
 
 1. In HACS, add this repository as a custom repository (category: *Integration*).
@@ -46,6 +52,20 @@ After submitting, you will be prompted to **press the right arrow (▶) on the F
 TLS to the Freebox is handled by the library, which bundles the Freebox CA — no HTTPS toggle is needed.
 
 Grants URL, grants key and poll interval can be edited later via *Configure* on the integration card. Changing the Freebox host requires removing and re-adding the integration.
+
+## Required Freebox permissions
+
+The Freebox API does **not** allow an app to request specific permissions during pairing — a fresh `app_token` starts with the default (minimal) permission set. You must grant the **Modification des réglages de la Freebox** (`settings`) permission to this integration manually, otherwise every Freebox call will fail with HTTP 403 `insufficient_rights` and entities will report `freebox_error`.
+
+Steps (one-time, after pairing):
+
+1. Open **Freebox OS** as administrator (`http://mafreebox.freebox.fr/`).
+2. Go to **Paramètres de la Freebox → Mode avancé → Gestion des accès → Applications**.
+3. Find the row named **JIT Freebox** (the `app_name` declared by this integration).
+4. Tick **Modification des réglages de la Freebox**, then save.
+5. In Home Assistant, reload the integration (or wait for the next poll).
+
+> If the admin password is later reset on the Freebox, **all app permissions are reset to defaults** and you will need to redo step 4.
 
 ## Entities
 
