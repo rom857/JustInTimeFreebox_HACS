@@ -1,0 +1,78 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Just-In-Time Freebox",
+        "description": "Autorisez juste à temps les redirections de ports sur votre Freebox locale. Après validation, il vous sera demandé d'appuyer sur la flèche droite du panneau avant de la Freebox pour autoriser cette intégration.",
+        "data": {
+          "grants_url": "URL de l'API externe Just In Time",
+          "grants_api_key": "Clé d'API externe Just In Time",
+          "freebox_host": "Hôte de la Freebox",
+          "freebox_port": "Port HTTPS de la Freebox (443 par défaut, prioritaire sur la découverte automatique)",
+          "poll_interval": "Intervalle de scrutation (secondes)"
+        }
+      },
+      "pairing": {
+        "title": "Autoriser sur la Freebox",
+        "description": "Appuyez sur la flèche droite (\u25b6) du panneau avant de la Freebox pour autoriser Home Assistant, puis validez. Cette étape attend la confirmation de la Freebox."
+      }
+    },
+    "error": {
+      "grants_api_error": "Impossible de joindre l'API externe Just In Time avec l'URL ou la clé fournies.",
+      "freebox_discovery_error": "Impossible de découvrir l'API Freebox sur cet hôte.",
+      "freebox_connection_error": "Impossible de se connecter à la Freebox.",
+      "pairing_denied": "L'autorisation a été refusée sur la Freebox.",
+      "unknown": "Une erreur inconnue s'est produite."
+    },
+    "abort": {
+      "already_configured": "Cette Freebox est déjà configurée."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Just-In-Time Freebox",
+        "data": {
+          "grants_url": "URL de l'API externe Just In Time",
+          "grants_api_key": "Clé d'API externe Just In Time",
+          "poll_interval": "Intervalle de scrutation (secondes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "granted": { "name": "Autorisé" }
+    },
+    "sensor": {
+      "status": {
+        "name": "Statut",
+        "state": {
+          "granted": "Autorisé",
+          "not_granted": "Non autorisé",
+          "unknown": "Inconnu"
+        }
+      },
+      "port": { "name": "Port" },
+      "protocol": {
+        "name": "Protocole",
+        "state": {
+          "tcp": "TCP",
+          "udp": "UDP"
+        }
+      },
+      "expires_at": { "name": "Expire le" },
+      "remaining_seconds": { "name": "Restant" },
+      "last_action": {
+        "name": "Dernière action",
+        "state": {
+          "idle": "Inactif",
+          "enabled_rule": "Règle activée",
+          "disabled_rule": "Règle désactivée",
+          "rule_not_found": "Règle introuvable",
+          "freebox_error": "Erreur Freebox"
+        }
+      }
+    }
+  }
+}

@@ -1,9 +1,9 @@
 {
   "domain": "just_in_time_freebox",
   "name": "Just-In-Time Freebox",
-  "version": "0.2.0",
-  "documentation": "https://github.com/your-org/JustInTimeFreebox_HACS",
-  "issue_tracker": "https://github.com/your-org/JustInTimeFreebox_HACS/issues",
+  "version": "0.0.14",
+  "documentation": "https://github.com/rom857/JustInTimeFreebox_HACS",
+  "issue_tracker": "https://github.com/rom857/JustInTimeFreebox_HACS/issues",
   "codeowners": [],
   "config_flow": true,
   "dependencies": [],
