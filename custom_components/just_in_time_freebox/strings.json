@@ -6,6 +6,7 @@
         "description": "Configure one profile (grants API + Freebox target). You can add multiple profiles for the same Freebox when each one uses a different grants API URL.",
         "data": {
           "profile_name": "Profile name (optional)",
+          "reuse_existing": "Reuse existing key and Freebox endpoint",
           "grants_url": "Grants API URL",
           "grants_api_key": "Grants API key",
           "freebox_host": "Freebox host",
@@ -22,6 +23,8 @@
       "grants_api_error": "Could not reach the grants API with the provided URL/key.",
       "freebox_discovery_error": "Could not discover the Freebox API at this host.",
       "freebox_connection_error": "Could not connect to the Freebox.",
+      "missing_required_fields": "Please provide grants API key and Freebox host, or enable reuse.",
+      "no_existing_to_reuse": "No existing configuration is available to reuse.",
       "pairing_denied": "Pairing was denied on the Freebox.",
       "unknown": "An unknown error occurred."
     },
