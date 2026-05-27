@@ -8,7 +8,6 @@ PLATFORMS = ["sensor", "binary_sensor"]
 CONF_GRANTS_URL = "grants_url"
 CONF_GRANTS_API_KEY = "grants_api_key"
 CONF_PROFILE_NAME = "profile_name"
-CONF_REUSE_EXISTING = "reuse_existing"
 CONF_POLL_INTERVAL = "poll_interval"
 CONF_FREEBOX_HOST = "freebox_host"          # api_domain returned by /api_version
 CONF_FREEBOX_PORT = "freebox_port"          # https_port returned by /api_version

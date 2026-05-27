@@ -25,7 +25,6 @@ from .const import (
     CONF_GRANTS_URL,
     CONF_POLL_INTERVAL,
     CONF_PROFILE_NAME,
-    CONF_REUSE_EXISTING,
     DEFAULT_HOST,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
@@ -68,7 +67,6 @@ def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     )
     schema: dict[Any, Any] = {
         vol.Optional(CONF_PROFILE_NAME, default=d.get(CONF_PROFILE_NAME, "")): str,
-        vol.Optional(CONF_REUSE_EXISTING, default=d.get(CONF_REUSE_EXISTING, False)): bool,
         vol.Required(CONF_GRANTS_URL, default=d.get(CONF_GRANTS_URL, "")): str,
         vol.Required(
             CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")
@@ -100,58 +98,23 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._user_input: dict[str, Any] = {}
 
-    def _pick_reuse_source(self) -> ConfigEntry | None:
-        """Return one existing entry to reuse common config from."""
-        entries = self._async_current_entries()
-        if not entries:
-            return None
-        return entries[0]
-
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            resolved_input = dict(user_input)
-
-            # Optional shortcut for additional entries:
-            # reuse grants API key + Freebox host/port from one existing entry.
-            if bool(resolved_input.get(CONF_REUSE_EXISTING)):
-                source = self._pick_reuse_source()
-                if source is None:
-                    errors["base"] = "no_existing_to_reuse"
-                else:
-                    source_data = {**source.data, **source.options}
-                    resolved_input[CONF_GRANTS_API_KEY] = source_data.get(
-                        CONF_GRANTS_API_KEY, ""
-                    )
-                    resolved_input[CONF_FREEBOX_HOST] = source_data.get(
-                        CONF_FREEBOX_HOST, DEFAULT_HOST
-                    )
-                    resolved_input[CONF_FREEBOX_PORT] = int(
-                        source_data.get(CONF_FREEBOX_PORT, 443)
-                    )
-
-            # Guard required fields in manual mode.
-            if not errors and not bool(resolved_input.get(CONF_REUSE_EXISTING)):
-                if not str(resolved_input.get(CONF_GRANTS_API_KEY, "")).strip():
-                    errors["base"] = "missing_required_fields"
-                elif not str(resolved_input.get(CONF_FREEBOX_HOST, "")).strip():
-                    errors["base"] = "missing_required_fields"
-
             session = async_get_clientsession(self.hass)
 
             # Validate grants API first (cheap, plain HTTP/HTTPS).
-            if not errors:
-                try:
-                    await fetch_grant(
-                        session,
-                        resolved_input[CONF_GRANTS_URL],
-                        resolved_input[CONF_GRANTS_API_KEY],
-                    )
-                except GrantsApiError as err:
-                    _LOGGER.warning("Grants API validation failed: %s", err)
-                    errors["base"] = "grants_api_error"
+            try:
+                await fetch_grant(
+                    session,
+                    user_input[CONF_GRANTS_URL],
+                    user_input[CONF_GRANTS_API_KEY],
+                )
+            except GrantsApiError as err:
+                _LOGGER.warning("Grants API validation failed: %s", err)
+                errors["base"] = "grants_api_error"
 
             # Discover Freebox HTTPS port + API version via plain HTTP.
             # The user-entered host is enforced verbatim; ``api_domain`` from
@@ -159,12 +122,12 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             # target a LAN IP or custom DNS name without being redirected to
             # the Freebox-assigned ``*.fbxos.fr`` hostname.
             # A user-supplied port (if any) overrides the discovered one.
-            user_port = resolved_input.get(CONF_FREEBOX_PORT)
+            user_port = user_input.get(CONF_FREEBOX_PORT)
             https_port: int | None = int(user_port) if user_port else None
             api_version: str | None = None
             if not errors:
                 try:
-                    info = await discover_api(session, resolved_input[CONF_FREEBOX_HOST])
+                    info = await discover_api(session, user_input[CONF_FREEBOX_HOST])
                     if https_port is None:
                         https_port = int(info["https_port"])
                     major = str(info.get("api_version", "8.0")).split(".", 1)[0]
@@ -175,9 +138,9 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
 
             if not errors:
                 instance_key = make_instance_key(
-                    str(resolved_input[CONF_FREEBOX_HOST]),
+                    str(user_input[CONF_FREEBOX_HOST]),
                     int(https_port),
-                    str(resolved_input[CONF_GRANTS_URL]),
+                    str(user_input[CONF_GRANTS_URL]),
                 )
 
                 # Prevent duplicate entries that target the same identity.
@@ -196,7 +159,7 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured(reason="already_configured")
 
                 self._user_input = {
-                    **resolved_input,
+                    **user_input,
                     CONF_FREEBOX_PORT: https_port,
                     CONF_FREEBOX_API_VERSION: api_version,
                     CONF_INSTANCE_KEY: instance_key,
