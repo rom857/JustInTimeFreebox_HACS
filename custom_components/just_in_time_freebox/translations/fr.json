@@ -6,7 +6,6 @@
         "description": "Configurez un profil (API de grants + cible Freebox). Vous pouvez ajouter plusieurs profils pour la même Freebox si chaque profil utilise une URL d'API de grants différente.",
         "data": {
           "profile_name": "Nom du profil (optionnel)",
-          "reuse_existing": "Réutiliser la clé existante et le point d'accès Freebox",
           "grants_url": "URL de l'API externe Just In Time",
           "grants_api_key": "Clé d'API externe Just In Time",
           "freebox_host": "Hôte de la Freebox",
@@ -23,8 +22,6 @@
       "grants_api_error": "Impossible de joindre l'API externe Just In Time avec l'URL ou la clé fournies.",
       "freebox_discovery_error": "Impossible de découvrir l'API Freebox sur cet hôte.",
       "freebox_connection_error": "Impossible de se connecter à la Freebox.",
-      "missing_required_fields": "Veuillez renseigner la clé d'API des grants et l'hôte Freebox, ou activer la réutilisation.",
-      "no_existing_to_reuse": "Aucune configuration existante n'est disponible pour la réutilisation.",
       "pairing_denied": "L'autorisation a été refusée sur la Freebox.",
       "unknown": "Une erreur inconnue s'est produite."
     },
