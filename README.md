@@ -4,8 +4,6 @@ A Home Assistant custom integration that polls an external "grants" API and, whe
 
 The grant decision is provided by the **Just In Time Portal** project: https://github.com/rom857/JustInTime_Portal
 
-The integration supports **multiple profiles** on the same Home Assistant instance. Each profile has its own grants API URL/key and poll interval, and can target the same Freebox.
-
 ## How it works
 
 Each poll, the integration calls your grants API. The expected JSON response is:
@@ -45,19 +43,16 @@ The integration **never creates or deletes Freebox rules** — it only toggles e
 
 The setup form asks for:
 
-- **Profile name (optional)** — friendly label to distinguish entries.
 - **Grants API URL** — full URL of your grants endpoint.
 - **Grants API key** — sent as `X-Access-Key: <key>`.
 - **Freebox host** — e.g. `mafreebox.freebox.fr` (default) or your LAN IP.
 - **Poll interval (seconds)** — minimum 5, default 30.
 
-After submitting, you will be prompted to **press the right arrow (▶) on the Freebox front panel** to authorize Home Assistant. The resulting `app_token` is stored under an entry-specific file in `<config>/just_in_time_freebox/` (managed by the `freebox-api` library).
+After submitting, you will be prompted to **press the right arrow (▶) on the Freebox front panel** to authorize Home Assistant. The resulting `app_token` is stored under `<config>/just_in_time_freebox/<host>.conf` (managed by the `freebox-api` library).
 
 TLS to the Freebox is handled by the library, which bundles the Freebox CA — no HTTPS toggle is needed.
 
 Grants URL, grants key and poll interval can be edited later via *Configure* on the integration card. Changing the Freebox host requires removing and re-adding the integration.
-
-Multiple entries are allowed for the same Freebox host, but duplicate entries using the same host + port + grants URL are blocked.
 
 ## Required Freebox permissions
 

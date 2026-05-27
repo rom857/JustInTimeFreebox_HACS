@@ -7,12 +7,10 @@ PLATFORMS = ["sensor", "binary_sensor"]
 # Config / options keys
 CONF_GRANTS_URL = "grants_url"
 CONF_GRANTS_API_KEY = "grants_api_key"
-CONF_PROFILE_NAME = "profile_name"
 CONF_POLL_INTERVAL = "poll_interval"
 CONF_FREEBOX_HOST = "freebox_host"          # api_domain returned by /api_version
 CONF_FREEBOX_PORT = "freebox_port"          # https_port returned by /api_version
 CONF_FREEBOX_API_VERSION = "freebox_api_version"  # e.g. "v15"
-CONF_INSTANCE_KEY = "instance_key"
 
 # Defaults
 DEFAULT_POLL_INTERVAL = 30

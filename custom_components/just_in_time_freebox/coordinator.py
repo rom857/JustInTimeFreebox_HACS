@@ -27,7 +27,6 @@ from .const import (
     BACKOFF_CAP_SECONDS,
     CONF_FREEBOX_API_VERSION,
     CONF_FREEBOX_HOST,
-    CONF_INSTANCE_KEY,
     CONF_FREEBOX_PORT,
     CONF_GRANTS_API_KEY,
     CONF_GRANTS_URL,
@@ -94,19 +93,12 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def async_open(self) -> None:
         """Open the Freebox session. Raises library exceptions on failure."""
-        from .config_flow import make_instance_key, token_path  # local import to avoid cycle
+        from .config_flow import token_path  # local import to avoid cycle
 
         host = self._merged[CONF_FREEBOX_HOST]
         port = int(self._merged[CONF_FREEBOX_PORT])
         api_version = self._merged[CONF_FREEBOX_API_VERSION]
-        token_key = self._merged.get(CONF_INSTANCE_KEY)
-        if not token_key:
-            token_key = make_instance_key(
-                str(host),
-                int(port),
-                str(self._merged.get(CONF_GRANTS_URL, "")),
-            )
-        token_file = token_path(self._hass, host, token_key=token_key)
+        token_file = token_path(self._hass, host)
         self._fbx = Freepybox(APP_DESC, token_file, api_version=api_version)
         _LOGGER.debug(
             "Opening Freebox session host=%s port=%s api=%s", host, port, api_version
