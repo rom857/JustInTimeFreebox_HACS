@@ -1,7 +1,7 @@
 {
   "domain": "just_in_time_freebox",
   "name": "Just-In-Time Freebox",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "documentation": "https://github.com/rom857/JustInTimeFreebox_HACS",
   "issue_tracker": "https://github.com/rom857/JustInTimeFreebox_HACS/issues",
   "codeowners": [],

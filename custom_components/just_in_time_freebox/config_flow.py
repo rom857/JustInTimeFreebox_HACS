@@ -1,6 +1,7 @@
 """Config and options flow for Just-In-Time Freebox."""
 from __future__ import annotations
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -11,16 +12,19 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
     APP_DESC,
     CONF_FREEBOX_API_VERSION,
     CONF_FREEBOX_HOST,
+    CONF_INSTANCE_KEY,
     CONF_FREEBOX_PORT,
     CONF_GRANTS_API_KEY,
     CONF_GRANTS_URL,
     CONF_POLL_INTERVAL,
+    CONF_PROFILE_NAME,
     DEFAULT_HOST,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
@@ -39,18 +43,34 @@ from .grants_api import GrantsApiError, fetch_grant
 _LOGGER = logging.getLogger(__name__)
 
 
-def token_path(hass: HomeAssistant, host: str) -> str:
-    """Return (and create) the per-host token file path used by Freepybox."""
+def make_instance_key(host: str, port: int, grants_url: str) -> str:
+    """Return a deterministic key for one integration entry identity."""
+    raw = f"{host.strip().lower()}|{int(port)}|{grants_url.strip()}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def token_path(hass: HomeAssistant, host: str, token_key: str | None = None) -> str:
+    """Return (and create) the token file path used by Freepybox."""
     directory = Path(hass.config.path(TOKEN_DIR))
     directory.mkdir(parents=True, exist_ok=True)
-    return str(directory / f"{slugify(host)}.conf")
+    host_slug = slugify(host)
+    if token_key:
+        return str(directory / f"{host_slug}_{token_key}.conf")
+    # Legacy fallback for very old entries.
+    return str(directory / f"{host_slug}.conf")
 
 
 def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     d = defaults or {}
+    secret_selector = selector.TextSelector(
+        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+    )
     schema: dict[Any, Any] = {
+        vol.Optional(CONF_PROFILE_NAME, default=d.get(CONF_PROFILE_NAME, "")): str,
         vol.Required(CONF_GRANTS_URL, default=d.get(CONF_GRANTS_URL, "")): str,
-        vol.Required(CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")): str,
+        vol.Required(
+            CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")
+        ): secret_selector,
         vol.Required(
             CONF_FREEBOX_HOST, default=d.get(CONF_FREEBOX_HOST, DEFAULT_HOST)
         ): str,
@@ -117,10 +137,32 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "freebox_discovery_error"
 
             if not errors:
+                instance_key = make_instance_key(
+                    str(user_input[CONF_FREEBOX_HOST]),
+                    int(https_port),
+                    str(user_input[CONF_GRANTS_URL]),
+                )
+
+                # Prevent duplicate entries that target the same identity.
+                for entry in self._async_current_entries():
+                    existing_key = entry.data.get(CONF_INSTANCE_KEY)
+                    if existing_key is None:
+                        existing_key = make_instance_key(
+                            str(entry.data.get(CONF_FREEBOX_HOST, "")),
+                            int(entry.data.get(CONF_FREEBOX_PORT, 443)),
+                            str(entry.data.get(CONF_GRANTS_URL, "")),
+                        )
+                    if existing_key == instance_key:
+                        return self.async_abort(reason="already_configured")
+
+                await self.async_set_unique_id(f"{DOMAIN}_{instance_key}")
+                self._abort_if_unique_id_configured(reason="already_configured")
+
                 self._user_input = {
                     **user_input,
                     CONF_FREEBOX_PORT: https_port,
                     CONF_FREEBOX_API_VERSION: api_version,
+                    CONF_INSTANCE_KEY: instance_key,
                 }
                 return await self.async_step_pairing()
 
@@ -139,7 +181,11 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
             host = self._user_input[CONF_FREEBOX_HOST]
             port = self._user_input[CONF_FREEBOX_PORT]
             api_version = self._user_input[CONF_FREEBOX_API_VERSION]
-            token_file = token_path(self.hass, host)
+            token_file = token_path(
+                self.hass,
+                host,
+                token_key=self._user_input.get(CONF_INSTANCE_KEY),
+            )
             fbx = Freepybox(APP_DESC, token_file, api_version=api_version)
             try:
                 await fbx.open(host, port)
@@ -159,7 +205,8 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
                     await fbx.close()
                 except Exception:  # noqa: BLE001
                     _LOGGER.debug("Ignoring error while closing pairing session", exc_info=True)
-                title = f"JIT Freebox ({host})"
+                profile_name = str(self._user_input.get(CONF_PROFILE_NAME, "")).strip()
+                title = profile_name or f"JIT Freebox ({host})"
                 return self.async_create_entry(title=title, data=self._user_input)
 
         return self.async_show_form(
@@ -187,6 +234,9 @@ class JitFreeboxOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         current = {**self._config_entry.data, **self._config_entry.options}
+        secret_selector = selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        )
         schema = vol.Schema(
             {
                 vol.Required(
@@ -194,7 +244,7 @@ class JitFreeboxOptionsFlow(OptionsFlow):
                 ): str,
                 vol.Required(
                     CONF_GRANTS_API_KEY, default=current.get(CONF_GRANTS_API_KEY, "")
-                ): str,
+                ): secret_selector,
                 vol.Required(
                     CONF_POLL_INTERVAL,
                     default=current.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),

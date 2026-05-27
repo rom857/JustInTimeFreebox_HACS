@@ -3,8 +3,9 @@
     "step": {
       "user": {
         "title": "Just-In-Time Freebox",
-        "description": "Configure the grants API and your local Freebox host. After submitting, you will be asked to press the right arrow on the Freebox front panel to authorize this integration.",
+        "description": "Configure one profile (grants API + Freebox target). You can add multiple profiles for the same Freebox when each one uses a different grants API URL.",
         "data": {
+          "profile_name": "Profile name (optional)",
           "grants_url": "Grants API URL",
           "grants_api_key": "Grants API key",
           "freebox_host": "Freebox host",

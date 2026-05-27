@@ -3,8 +3,9 @@
     "step": {
       "user": {
         "title": "Just-In-Time Freebox",
-        "description": "Autorisez juste à temps les redirections de ports sur votre Freebox locale. Après validation, il vous sera demandé d'appuyer sur la flèche droite du panneau avant de la Freebox pour autoriser cette intégration.",
+        "description": "Configurez un profil (API de grants + cible Freebox). Vous pouvez ajouter plusieurs profils pour la même Freebox si chaque profil utilise une URL d'API de grants différente.",
         "data": {
+          "profile_name": "Nom du profil (optionnel)",
           "grants_url": "URL de l'API externe Just In Time",
           "grants_api_key": "Clé d'API externe Just In Time",
           "freebox_host": "Hôte de la Freebox",
