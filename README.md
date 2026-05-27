@@ -46,6 +46,7 @@ The integration **never creates or deletes Freebox rules** — it only toggles e
 The setup form asks for:
 
 - **Profile name (optional)** — friendly label to distinguish entries.
+- **Reuse existing key and Freebox endpoint** — for additional profiles, copies grants API key + Freebox host/port from an existing entry.
 - **Grants API URL** — full URL of your grants endpoint.
 - **Grants API key** — sent as `X-Access-Key: <key>`.
 - **Freebox host** — e.g. `mafreebox.freebox.fr` (default) or your LAN IP.
