@@ -72,12 +72,9 @@ Steps (one-time, after pairing):
 
 A single device is created with:
 
-- `binary_sensor.*_granted` — current grant state (`connectivity` device class).
-- `sensor.*_status` — `granted` / `not_granted` / `unknown`.
+- `binary_sensor.*_granted` — current port state (`opened` / `closed`).
 - `sensor.*_port` — current port.
 - `sensor.*_protocol` — `tcp` / `udp`.
-- `sensor.*_expires_at` — timestamp.
-- `sensor.*_remaining` — duration in seconds.
 - `sensor.*_last_action` — diagnostic: `idle`, `enabled_rule`, `disabled_rule`, `rule_not_found`, `freebox_error`.
 
 ## Resilience
@@ -87,6 +84,7 @@ If the Freebox is unreachable, the integration applies **exponential backoff** t
 ## Troubleshooting
 
 - **`rule_not_found`** — create the matching redirection on the Freebox first (Freebox OS → Paramètres de la Freebox → Gestion des ports), matching the grant's `port` (as `lan_port`) and `protocol`. The integration will only flip its `enabled` flag.
+- **Port sensor shows `closed` while grant looks valid** — ensure the target rule exists and the app has Freebox `settings` permission; otherwise the integration cannot switch the rule to `enabled`.
 - **Pairing fails** — confirm the Freebox host is reachable and that you pressed the front-panel button.
 - **`freebox_connection_error`** — verify `http://<host>/api_version` is reachable from Home Assistant; the integration uses it to discover the API endpoint.
 - Enable debug logs via `logger:` → `custom_components.just_in_time_freebox: debug` (and `freebox_api: debug`) to inspect requests.

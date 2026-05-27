@@ -2,32 +2,18 @@
   "entity": {
     "binary_sensor": {
       "granted": {
-        "default": "mdi:lock",
+        "default": "mdi:lan-disconnect",
         "state": {
-          "on": "mdi:lock-open-variant"
+          "on": "mdi:lan-connect"
         }
       }
     },
     "sensor": {
-      "status": {
-        "default": "mdi:shield-question",
-        "state": {
-          "granted": "mdi:shield-check",
-          "not_granted": "mdi:shield-off",
-          "unknown": "mdi:shield-question"
-        }
-      },
       "port": {
         "default": "mdi:ethernet"
       },
       "protocol": {
         "default": "mdi:transit-connection-variant"
-      },
-      "expires_at": {
-        "default": "mdi:clock-end"
-      },
-      "remaining_seconds": {
-        "default": "mdi:timer-sand"
       },
       "last_action": {
         "default": "mdi:history",

@@ -42,14 +42,11 @@
   },
   "entity": {
     "binary_sensor": {
-      "granted": { "name": "Granted" }
+      "granted": { "name": "Port" }
     },
     "sensor": {
-      "status": { "name": "Status" },
       "port": { "name": "Port" },
       "protocol": { "name": "Protocol" },
-      "expires_at": { "name": "Expires at" },
-      "remaining_seconds": { "name": "Remaining" },
       "last_action": { "name": "Last action" }
     }
   }

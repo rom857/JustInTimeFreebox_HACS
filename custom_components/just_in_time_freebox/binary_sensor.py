@@ -1,4 +1,4 @@
-"""Binary sensor for the granted state."""
+"""Binary sensor for the port open/closed state."""
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import (
@@ -38,8 +38,8 @@ class JitFreeboxGrantedBinarySensor(
     CoordinatorEntity[JitFreeboxCoordinator], BinarySensorEntity
 ):
     _attr_has_entity_name = True
-    _attr_name = "Granted"
-    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_name = "Port"
+    _attr_device_class = BinarySensorDeviceClass.DOOR
     _attr_translation_key = "granted"
 
     def __init__(
@@ -52,4 +52,7 @@ class JitFreeboxGrantedBinarySensor(
     @property
     def is_on(self) -> bool | None:
         data = self.coordinator.data or {}
-        return data.get("granted")
+        desired_enabled = data.get("desired_enabled")
+        if desired_enabled is None:
+            return None
+        return bool(desired_enabled)

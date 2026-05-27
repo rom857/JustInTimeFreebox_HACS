@@ -9,7 +9,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, UnitOfTime
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -39,13 +39,6 @@ def _device_info(entry: ConfigEntry) -> DeviceInfo:
 
 SENSORS: tuple[SensorEntityDescription, ...] = (
     SensorEntityDescription(
-        key="status",
-        translation_key="status",
-        name="Status",
-        device_class=SensorDeviceClass.ENUM,
-        options=["granted", "not_granted", "unknown"],
-    ),
-    SensorEntityDescription(
         key="port",
         translation_key="port",
         name="Port",
@@ -56,19 +49,6 @@ SENSORS: tuple[SensorEntityDescription, ...] = (
         name="Protocol",
         device_class=SensorDeviceClass.ENUM,
         options=["tcp", "udp"],
-    ),
-    SensorEntityDescription(
-        key="expires_at",
-        translation_key="expires_at",
-        name="Expires at",
-        device_class=SensorDeviceClass.TIMESTAMP,
-    ),
-    SensorEntityDescription(
-        key="remaining_seconds",
-        translation_key="remaining_seconds",
-        name="Remaining",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.SECONDS,
     ),
     SensorEntityDescription(
         key="last_action",
@@ -116,21 +96,10 @@ class JitFreeboxSensor(CoordinatorEntity[JitFreeboxCoordinator], SensorEntity):
     def native_value(self) -> Any:
         data = self.coordinator.data or {}
         key = self.entity_description.key
-        if key == "status":
-            granted = data.get("granted")
-            if granted is True:
-                return "granted"
-            if granted is False:
-                return "not_granted"
-            return "unknown"
         if key == "port":
             return data.get("port")
         if key == "protocol":
             return data.get("protocol")
-        if key == "expires_at":
-            return data.get("expires_utc")
-        if key == "remaining_seconds":
-            return data.get("remaining_seconds")
         if key == "last_action":
             return data.get("last_action") or ACTION_IDLE
         return None

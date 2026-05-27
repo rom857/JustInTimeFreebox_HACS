@@ -42,17 +42,9 @@
   },
   "entity": {
     "binary_sensor": {
-      "granted": { "name": "Autorisé" }
+      "granted": { "name": "Port" }
     },
     "sensor": {
-      "status": {
-        "name": "Statut",
-        "state": {
-          "granted": "Autorisé",
-          "not_granted": "Non autorisé",
-          "unknown": "Inconnu"
-        }
-      },
       "port": { "name": "Port" },
       "protocol": {
         "name": "Protocole",
@@ -61,8 +53,6 @@
           "udp": "UDP"
         }
       },
-      "expires_at": { "name": "Expire le" },
-      "remaining_seconds": { "name": "Restant" },
       "last_action": {
         "name": "Dernière action",
         "state": {
