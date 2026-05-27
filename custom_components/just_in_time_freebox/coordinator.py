@@ -22,6 +22,7 @@ from .const import (
     ACTION_ENABLED,
     ACTION_FREEBOX_ERROR,
     ACTION_IDLE,
+    ACTION_PARTIAL_SUCCESS,
     ACTION_RULE_NOT_FOUND,
     APP_DESC,
     BACKOFF_CAP_SECONDS,
@@ -42,7 +43,7 @@ from .freebox_api import (
     NotOpenError,
     find_rule,
 )
-from .grants_api import GrantsApiError, fetch_grant
+from .grants_api import GrantsApiError, fetch_grants
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,11 +85,9 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._consecutive_failures = 0
         self._next_attempt: datetime | None = None
 
-        # Track the rule we last operated on so we can disable it on drift
-        # (e.g. when the grant moves to a different port).
-        self._active_rule_id: int | None = None
-        self._active_port: int | None = None
-        self._active_proto: str | None = None
+        # Track which (port, protocol) pairs we've enabled, per targetId.
+        # Used to detect drift (stale rules from old/removed grants).
+        self._managed_rules: dict[str, int] = {}  # {targetId: rule_id}
 
     # -- lifecycle ------------------------------------------------------
 
@@ -155,9 +154,9 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         prev = self.data or {}
         last_action = prev.get("last_action", ACTION_IDLE)
 
-        # 1) Grants API
+        # 1) Fetch grants from external API (array)
         try:
-            grant = await fetch_grant(
+            grants = await fetch_grants(
                 session,
                 self._merged[CONF_GRANTS_URL],
                 self._merged[CONF_GRANTS_API_KEY],
@@ -165,98 +164,171 @@ class JitFreeboxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except GrantsApiError as err:
             raise UpdateFailed(f"Grants API error: {err}") from err
 
-        granted = bool(grant.get("granted"))
-        port = grant.get("port")
-        protocol = (grant.get("protocol") or "").lower() or None
-        expires_utc = grant.get("expiresUtc")
-        started_utc = grant.get("startedUtc")
-        remaining_seconds = grant.get("remainingSeconds")
+        # Initialize tracking
+        active_grants: list[dict[str, Any]] = []
+        failed_targets: list[str] = []
+        actions_taken: list[str] = []
 
-        expires_dt = _parse_iso(expires_utc)
-        not_expired = expires_dt is None or expires_dt > _now_utc()
-        desired_enabled = granted and not_expired
+        # 2) Build desired_open set: {(port, protocol) for all granted and not_expired}
+        desired_open: dict[tuple[int, str], dict[str, Any]] = {}
+        for grant in grants:
+            target_id = grant.get("targetId", "unknown")
+            granted = bool(grant.get("granted", False))
+            port = grant.get("port")
+            protocol = grant.get("protocol")
+            expires_utc = grant.get("expires_utc")
 
-        data: dict[str, Any] = {
-            "granted": granted,
-            "port": port,
-            "protocol": protocol,
-            "started_utc": started_utc,
-            "expires_utc": expires_utc,
-            "remaining_seconds": remaining_seconds,
-            "desired_enabled": desired_enabled,
-            "last_action": last_action,
-        }
+            # Check expiration
+            not_expired = expires_utc is None or expires_utc > _now_utc()
 
-        # 2) Respect backoff window.
+            # Only include in desired_open if granted and not expired
+            if granted and not_expired and port is not None and protocol is not None:
+                key = (int(port), protocol)
+                desired_open[key] = grant
+
+            # Track for reporting
+            active_grants.append({
+                "targetId": target_id,
+                "port": port,
+                "protocol": protocol,
+                "granted": granted,
+                "expires_utc": expires_utc.isoformat() if expires_utc else None,
+                "remaining_seconds": grant.get("remaining_seconds"),
+            })
+
+        # 3) Respect backoff window
         if self._next_attempt is not None and _now_utc() < self._next_attempt:
-            data["last_action"] = ACTION_FREEBOX_ERROR
+            data: dict[str, Any] = {
+                "active_grants": active_grants,
+                "last_action": ACTION_FREEBOX_ERROR,
+                "timestamp": _now_utc().isoformat(),
+            }
             return data
 
         if self._fbx is None:
-            data["last_action"] = ACTION_FREEBOX_ERROR
+            data = {
+                "active_grants": active_grants,
+                "last_action": ACTION_FREEBOX_ERROR,
+                "timestamp": _now_utc().isoformat(),
+            }
             return data
 
-        # 3) Handle rule drift (port/proto changed) -> disable previous rule.
-        if (
-            self._active_rule_id is not None
-            and (self._active_port != port or self._active_proto != protocol)
-        ):
-            try:
-                await self._set_enabled(self._active_rule_id, False)
-                _LOGGER.debug(
-                    "Disabled previous active rule id=%s (port/proto drift)",
-                    self._active_rule_id,
-                )
-            except (HttpRequestError, NotOpenError, AuthorizationError) as err:
-                _LOGGER.warning("Freebox error while disabling stale rule: %s", err)
-                self._schedule_backoff()
-                data["last_action"] = ACTION_FREEBOX_ERROR
-                return data
-            self._active_rule_id = None
-            self._active_port = None
-            self._active_proto = None
-
-        if port is None or protocol is None:
-            self._reset_backoff()
-            return data
-
-        # 4) Find and reconcile the matching rule.
+        # 4) Fetch current Freebox rules
         try:
             redirs = await self._list_redirs()
-            rule = find_rule(redirs, int(port), protocol)
-            if rule is None:
-                data["last_action"] = ACTION_RULE_NOT_FOUND
-                _LOGGER.debug(
-                    "No Freebox redir matches lan_port=%s proto=%s", port, protocol
+        except (HttpRequestError, NotOpenError, AuthorizationError) as err:
+            _LOGGER.warning("Freebox error while fetching rules: %s", err)
+            self._schedule_backoff()
+            data = {
+                "active_grants": active_grants,
+                "last_action": ACTION_FREEBOX_ERROR,
+                "timestamp": _now_utc().isoformat(),
+            }
+            return data
+
+        # Build current_open set from Freebox: {(port, protocol): rule_id}
+        current_open: dict[tuple[int, str], int] = {}
+        for rule in redirs:
+            if not rule.get("enabled", False):
+                continue
+            lan_port = rule.get("lan_port")
+            protocol = rule.get("protocol", "").lower()
+            if lan_port is not None and protocol:
+                key = (int(lan_port), protocol)
+                current_open[key] = int(rule["id"])
+
+        # 5) Reconcile: enable rules for desired_open that aren't current, disable stale rules
+        rules_to_enable = desired_open.keys() - current_open.keys()
+        rules_to_disable = current_open.keys() - desired_open.keys()
+
+        # Disable stale rules
+        for port_proto in rules_to_disable:
+            rule_id = current_open[port_proto]
+            try:
+                await self._set_enabled(rule_id, False)
+                port, proto = port_proto
+                actions_taken.append(f"disabled_rule:{port}/{proto}")
+                _LOGGER.info(
+                    "Disabled stale rule id=%s (port=%s, proto=%s)",
+                    rule_id,
+                    port,
+                    proto,
                 )
-                self._reset_backoff()
+            except (HttpRequestError, NotOpenError, AuthorizationError) as err:
+                _LOGGER.warning("Freebox error while disabling rule %s: %s", rule_id, err)
+                self._schedule_backoff()
+                data = {
+                    "active_grants": active_grants,
+                    "last_action": ACTION_FREEBOX_ERROR,
+                    "timestamp": _now_utc().isoformat(),
+                }
                 return data
 
+        # Enable rules for new grants
+        for port_proto in rules_to_enable:
+            port, protocol = port_proto
+            grant = desired_open[port_proto]
+            target_id = grant.get("targetId", "unknown")
+
+            # Find matching rule on Freebox
+            rule = find_rule(redirs, port, protocol)
+            if rule is None:
+                failed_targets.append(target_id)
+                _LOGGER.debug(
+                    "No Freebox rule found for targetId=%s (port=%s, proto=%s)",
+                    target_id,
+                    port,
+                    protocol,
+                )
+                actions_taken.append(f"rule_not_found:{port}/{protocol}")
+                continue
+
             rule_id = int(rule["id"])
-            current_enabled = bool(rule.get("enabled", False))
-
-            if current_enabled != desired_enabled:
-                await self._set_enabled(rule_id, desired_enabled)
-                data["last_action"] = (
-                    ACTION_ENABLED if desired_enabled else ACTION_DISABLED
-                )
+            try:
+                await self._set_enabled(rule_id, True)
+                self._managed_rules[target_id] = rule_id
+                actions_taken.append(f"enabled_rule:{port}/{protocol}")
                 _LOGGER.info(
-                    "Reconciled Freebox rule id=%s enabled %s -> %s",
+                    "Enabled rule id=%s for targetId=%s (port=%s, proto=%s)",
                     rule_id,
-                    current_enabled,
-                    desired_enabled,
+                    target_id,
+                    port,
+                    protocol,
                 )
-            else:
-                data["last_action"] = ACTION_IDLE
+            except (HttpRequestError, NotOpenError, AuthorizationError) as err:
+                _LOGGER.warning(
+                    "Freebox error while enabling rule for targetId=%s: %s",
+                    target_id,
+                    err,
+                )
+                self._schedule_backoff()
+                data = {
+                    "active_grants": active_grants,
+                    "last_action": ACTION_FREEBOX_ERROR,
+                    "timestamp": _now_utc().isoformat(),
+                }
+                return data
 
-            self._active_rule_id = rule_id
-            self._active_port = int(port)
-            self._active_proto = protocol
-            self._reset_backoff()
-        except (HttpRequestError, NotOpenError, AuthorizationError) as err:
-            _LOGGER.warning("Freebox error during reconcile: %s", err)
-            self._schedule_backoff()
-            data["last_action"] = ACTION_FREEBOX_ERROR
+        # 6) Determine summary action
+        if not active_grants:
+            summary_action = ACTION_IDLE
+        elif failed_targets and actions_taken:
+            summary_action = ACTION_PARTIAL_SUCCESS
+        elif actions_taken:
+            summary_action = ACTION_ENABLED
+        else:
+            summary_action = ACTION_IDLE
+
+        self._reset_backoff()
+
+        # 7) Build final data dict
+        data = {
+            "active_grants": active_grants,
+            "failed_targets": failed_targets,
+            "actions_taken": actions_taken,
+            "last_action": summary_action,
+            "timestamp": _now_utc().isoformat(),
+        }
 
         return data
 
