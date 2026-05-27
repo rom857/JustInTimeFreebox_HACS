@@ -1,7 +1,6 @@
 """Sensor entities for Just-In-Time Freebox."""
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -40,19 +39,6 @@ def _device_info(entry: ConfigEntry) -> DeviceInfo:
 
 
 SENSORS: tuple[SensorEntityDescription, ...] = (
-    SensorEntityDescription(
-        key="grants_active_count",
-        translation_key="grants_active_count",
-        name="Grants Active Count",
-        device_class=SensorDeviceClass.ENUM,
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    SensorEntityDescription(
-        key="targets_summary",
-        translation_key="targets_summary",
-        name="Targets Summary",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
     SensorEntityDescription(
         key="last_action",
         translation_key="last_action",
@@ -99,30 +85,7 @@ class JitFreeboxSensor(CoordinatorEntity[JitFreeboxCoordinator], SensorEntity):
     @property
     def native_value(self) -> Any:
         data = self.coordinator.data or {}
-        key = self.entity_description.key
-
-        if key == "grants_active_count":
-            active_grants = data.get("active_grants", [])
-            granted_count = sum(
-                1 for g in active_grants
-                if g.get("granted") and g.get("expires_utc")
-            )
-            return granted_count
-
-        if key == "targets_summary":
-            active_grants = data.get("active_grants", [])
-            granted_count = sum(
-                1 for g in active_grants if g.get("granted")
-            )
-            denied_count = sum(
-                1 for g in active_grants if not g.get("granted")
-            )
-            return f"{granted_count} granted, {denied_count} denied"
-
-        if key == "last_action":
-            return data.get("last_action", ACTION_IDLE)
-
-        return None
+        return data.get("last_action", ACTION_IDLE)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

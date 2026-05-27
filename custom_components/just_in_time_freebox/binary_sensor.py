@@ -117,8 +117,8 @@ class JitFreeboxTargetBinarySensor(
         self._target_id = target_id
         self._port = port
 
-        # Entity name: "OpenVPN (1194) Opened"
-        self._attr_name = f"{target_id.replace('_', ' ').title()} ({port})" if port else target_id
+        # Entity name: "Port 1194"
+        self._attr_name = f"Port {port}" if port else f"Port ({target_id})"
 
         self._attr_unique_id = f"{entry.entry_id}_{target_id}_opened"
         self._attr_device_info = _device_info(entry)
