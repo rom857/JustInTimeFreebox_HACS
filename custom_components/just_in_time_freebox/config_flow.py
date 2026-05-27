@@ -178,7 +178,7 @@ class JitFreeboxOptionsFlow(OptionsFlow):
     """Editable options (grants URL/key and poll interval only)."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -186,7 +186,7 @@ class JitFreeboxOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        current = {**self.config_entry.data, **self.config_entry.options}
+        current = {**self._config_entry.data, **self._config_entry.options}
         schema = vol.Schema(
             {
                 vol.Required(
