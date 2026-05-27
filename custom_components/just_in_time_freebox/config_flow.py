@@ -156,7 +156,7 @@ class JitFreeboxConfigFlow(ConfigFlow, domain=DOMAIN):
                         return self.async_abort(reason="already_configured")
 
                 await self.async_set_unique_id(f"{DOMAIN}_{instance_key}")
-                self._abort_if_unique_id_configured()
+                self._abort_if_unique_id_configured(reason="already_configured")
 
                 self._user_input = {
                     **user_input,
