@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import selector
 from homeassistant.util import slugify
 
 from .const import (
@@ -48,9 +49,14 @@ def token_path(hass: HomeAssistant, host: str) -> str:
 
 def _user_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     d = defaults or {}
+    secret_selector = selector.TextSelector(
+        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+    )
     schema: dict[Any, Any] = {
         vol.Required(CONF_GRANTS_URL, default=d.get(CONF_GRANTS_URL, "")): str,
-        vol.Required(CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")): str,
+        vol.Required(
+            CONF_GRANTS_API_KEY, default=d.get(CONF_GRANTS_API_KEY, "")
+        ): secret_selector,
         vol.Required(
             CONF_FREEBOX_HOST, default=d.get(CONF_FREEBOX_HOST, DEFAULT_HOST)
         ): str,
@@ -187,6 +193,9 @@ class JitFreeboxOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         current = {**self._config_entry.data, **self._config_entry.options}
+        secret_selector = selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        )
         schema = vol.Schema(
             {
                 vol.Required(
@@ -194,7 +203,7 @@ class JitFreeboxOptionsFlow(OptionsFlow):
                 ): str,
                 vol.Required(
                     CONF_GRANTS_API_KEY, default=current.get(CONF_GRANTS_API_KEY, "")
-                ): str,
+                ): secret_selector,
                 vol.Required(
                     CONF_POLL_INTERVAL,
                     default=current.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
